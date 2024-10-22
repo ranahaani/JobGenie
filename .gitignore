@@ -1,0 +1,61 @@
+# Ignore Python bytecode files
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignore environment files
+.env
+.venv/
+env/
+venv/
+
+# Ignore log files
+*.log
+
+# Ignore cookies file
+cookies.json
+
+# Ignore IDE specific files
+.idea/
+.vscode/
+
+# Ignore OS specific files
+.DS_Store
+Thumbs.db
+
+# Ignore compiled C extensions
+*.so
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore coverage reports
+htmlcov/
+.coverage
+.tox/
+.nox/
+.cache/
+
+# Ignore test and build directories
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Ignore wheel files
+*.whl
+
+# Ignore temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Ignore Selenium WebDriver binaries
+chromedriver
+geckodriver
+msedgedriver
+operadriver
+IEDriverServer
+# End Generation Here
