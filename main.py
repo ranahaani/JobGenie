@@ -20,7 +20,7 @@ class JobApplicationBot:
         self.driver_path = driver_path
         self.cookies_file = cookies_file
         self.chrome_options = Options()
-        # self.chrome_options.add_argument("--headless")
+        self.chrome_options.add_argument("--headless")
         self.chrome_options.add_argument("--no-sandbox")
         self.chrome_options.add_argument("--disable-dev-shm-usage")
         self.driver = None
@@ -36,10 +36,12 @@ class JobApplicationBot:
     def search_jobs_on_google(self, query):
         self._initialize_driver()
         try:
-            job_urls = []
-            for url in search(query, num=10, stop=10, pause=2, tbs='qdr:d'):
-                if 'join.com/companies' in url:
-                    job_urls.append(url)
+            with open('applied.txt', 'r') as file:
+                applied_urls = file.read().splitlines()
+            job_urls = [
+                url for url in search(query, num=10, stop=10, pause=2, tbs='qdr:d')
+                if 'join.com/companies' in url and url not in applied_urls
+            ]
             return job_urls
         finally:
             self._quit_driver()
