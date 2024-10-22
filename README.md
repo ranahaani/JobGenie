@@ -32,6 +32,7 @@ This project is a Python-based automation tool designed to search for job listin
 3. **Configure your environment**:
    - Ensure you have a valid Anti-Captcha API key.
    - Update the `cookies.json` file with your session cookies for the target job application site.
+   - Update the `config.json` file with your personal application details such as start date, expected compensation, and other relevant information.
 
 ## Usage
 
@@ -47,6 +48,7 @@ This project is a Python-based automation tool designed to search for job listin
 
 - Ensure that your `cookies.json` file is up-to-date with valid session cookies to avoid login issues.
 - The bot is configured to work with job listings on `join.com`. Modify the code if you wish to target other websites.
+- Make sure your `config.json` file is correctly filled out to ensure accurate application submissions.
 
 ## License
 
