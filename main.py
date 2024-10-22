@@ -14,23 +14,12 @@ from googlesearch import search
 logging.basicConfig(level=logging.INFO)
 
 
-                    # Check if the resume is already uploaded
-                    # uploaded_icon = form.find_element(By.XPATH, ".//i[@data-testid='attachment-uploaded-icon']")
-                    # if not uploaded_icon:
-                    #     # Upload resume if not already uploaded
-                    #     resume_input = form.find_element(By.XPATH, ".//input[@type='file']")
-                    #     resume_input.send_keys("/path/to/your/resume.pdf")
-
-                    # Optionally upload a cover letter
-                    # cover_letter_input = form.find_element(By.XPATH, ".//input[@type='file']")
-                    # cover_letter_input.send_keys("/path/to/your/cover_letter.pdf")
-
 class JobApplicationBot:
     def __init__(self, driver_path, cookies_file):
         self.driver_path = driver_path
         self.cookies_file = cookies_file
         self.chrome_options = Options()
-        # self.chrome_options.add_argument("--headless")
+        self.chrome_options.add_argument("--headless")
         self.chrome_options.add_argument("--no-sandbox")
         self.chrome_options.add_argument("--disable-dev-shm-usage")
         self.driver = None
@@ -47,7 +36,6 @@ class JobApplicationBot:
         self._initialize_driver()
         try:
             job_urls = []
-            # Use the 'tbs' parameter to filter results from the last 24 hours
             for url in search(query, num=10, stop=10, pause=2, tbs='qdr:d'):
                 if 'join.com/companies' in url:
                     job_urls.append(url)
@@ -86,13 +74,14 @@ class JobApplicationBot:
                 try:
                     form = self.driver.find_element(By.XPATH, "//form[@data-testid='ApplyStep1Form']")
                     apply_button = form.find_element(By.XPATH, ".//button[@type='submit']")
-                    
+
                     # Use JavaScript to click the button to avoid detection
                     self.driver.execute_script("arguments[0].click();", apply_button)
-                    
+
                     time.sleep(random.uniform(1, 3))
                     try:
-                        recaptcha_error = form.find_element(By.XPATH, ".//div[contains(text(), 'Recaptcha token is invalid')]")
+                        recaptcha_error = form.find_element(By.XPATH,
+                                                            ".//div[contains(text(), 'Recaptcha token is invalid')]")
                         if recaptcha_error:
                             logging.error("Recaptcha token is invalid. Cannot proceed with application.")
                     except NoSuchElementException:
