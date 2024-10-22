@@ -1,0 +1,9 @@
+{
+    "reside_in_barcelona": "No",
+    "start_date": "2023-11-01",
+    "expected_compensation": "40000",
+    "english_proficiency": "Professional working proficiency",
+    "require_sponsorship": "Yes",
+    "react_experience": "3",
+    "skills": ["React", "Python", "Angular", "Django"]
+}
