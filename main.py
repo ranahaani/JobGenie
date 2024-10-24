@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -15,12 +16,24 @@ from googlesearch import search
 logging.basicConfig(level=logging.INFO)
 
 
+# Check if the resume is already uploaded
+# uploaded_icon = form.find_element(By.XPATH, ".//i[@data-testid='attachment-uploaded-icon']")
+# if not uploaded_icon:
+#     # Upload resume if not already uploaded
+#     resume_input = form.find_element(By.XPATH, ".//input[@type='file']")
+#     resume_input.send_keys("/path/to/your/resume.pdf")
+
+# Optionally upload a cover letter
+# cover_letter_input = form.find_element(By.XPATH, ".//input[@type='file']")
+# cover_letter_input.send_keys("/path/to/your/cover_letter.pdf")
+
+
 class JobApplicationBot:
     def __init__(self, driver_path, cookies_file):
         self.driver_path = driver_path
         self.cookies_file = cookies_file
         self.chrome_options = Options()
-        self.chrome_options.add_argument("--headless")
+        # self.chrome_options.add_argument("--headless")
         self.chrome_options.add_argument("--no-sandbox")
         self.chrome_options.add_argument("--disable-dev-shm-usage")
         self.driver = None
@@ -34,14 +47,32 @@ class JobApplicationBot:
             self.driver.quit()
 
     def search_jobs_on_google(self, query):
-        self._initialize_driver()
+
         try:
+            job_urls = []
             with open('applied.txt', 'r') as file:
                 applied_urls = file.read().splitlines()
-            job_urls = [
-                url for url in search(query, num=10, stop=10, pause=2, tbs='qdr:d')
-                if 'join.com/companies' in url and url not in applied_urls
-            ]
+            try:
+                job_urls = [
+                    # url for url in search(query, num=100, stop=100, pause=3, tbs='qdr:d')
+                    # if 'join.com/companies' in url and url not in applied_urls
+                ]
+            except:
+                pass
+            
+            if not job_urls:
+                self._initialize_driver()
+                n_pages = 3
+                for page in range(1, n_pages):
+                    url = "http://www.google.com/search?q=" + query + "&start=" + str((page - 1) * 10)
+                    self.driver.get(url)
+                    soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                    # soup = BeautifulSoup(r.text, 'html.parser')
+
+                    searches = soup.find_all('div', class_="yuRUbf")
+                    for h in searches:
+                        if 'join.com/companies' in h.a.get('href') and h.a.get('href') not in applied_urls:
+                            job_urls.append(h.a.get('href'))
             return job_urls
         finally:
             self._quit_driver()
@@ -84,27 +115,32 @@ class JobApplicationBot:
                     form = self.driver.find_element(By.XPATH, "//form[@data-testid='ApplyStep1Form']")
                     logged_in = True
                     apply_button = form.find_element(By.XPATH, ".//button[@type='submit']")
+
                     time.sleep(random.uniform(1, 4))
                     self.driver.execute_script("arguments[0].click();", apply_button)
-                    time.sleep(random.uniform(8, 15))
+                    logging.error(f"Applied for the {job_url} successfully")
+
+                    time.sleep(random.uniform(15, 25))
                 except NoSuchElementException:
                     logging.info("No Recaptcha error found. Proceeding with application.")
 
                 try:
+                    # time.sleep(random.uniform(15, 25))
                     form = self.driver.find_element(By.XPATH, "//form[@id='OnePagerForm']")
                     questions = form.find_elements(By.XPATH, ".//div[@data-testid='QuestionItem']")
 
                     for question in questions:
                         question_text = question.find_element(By.XPATH, ".//span").text
                         answer_field = question.find_element(By.XPATH, ".//div[@data-testid='QuestionAnswer']")
+                        time.sleep(random.uniform(1, 3))
 
-                        if "reside in" in question_text:
+                        if "reside in" in question_text or "currently legally permitted to work in" in question_text:
                             answer = config_data.get("reside_in_barcelona", "No")
                             yes_no_field = answer_field.find_element(By.XPATH,
                                                                      f".//div[@data-testid='{answer}Answer']")
                             self.driver.execute_script("arguments[0].click();", yes_no_field)
 
-                        elif "available to start" in question_text:
+                        elif "available to start" in question_text or "available to start working" in question_text:
                             start_date = config_data.get("start_date", "")
                             date_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
                             date_input.send_keys(start_date)
@@ -119,6 +155,11 @@ class JobApplicationBot:
                             proficiency_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
                             proficiency_input.send_keys(proficiency)
 
+                        elif "level of proficiency in" in question_text:
+                            proficiency = config_data.get("german_proficiency", "None")
+                            proficiency_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
+                            proficiency_input.send_keys(proficiency)
+
                         elif "require sponsorship for employment visa status" in question_text:
                             sponsorship = config_data.get("require_sponsorship", "Yes")
                             yes_no_field = answer_field.find_element(By.XPATH,
@@ -130,6 +171,16 @@ class JobApplicationBot:
                             experience_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
                             experience_input.send_keys(experience)
 
+                        elif "city do you currently live in" in question_text:
+                            experience = config_data.get("current_city", "Lahore, Pakistan")
+                            experience_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
+                            experience_input.send_keys(experience)
+
+                        elif "comfortable working in a remote" in question_text:
+                            experience = config_data.get("remotely_available", "Yes")
+                            experience_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
+                            experience_input.send_keys(experience)
+
                     submit_button = form.find_element(By.XPATH, ".//button[@type='submit']")
                     self.driver.execute_script("arguments[0].click();", submit_button)
                     with open("applied.txt", "a") as file:
@@ -137,14 +188,24 @@ class JobApplicationBot:
 
                     time.sleep(random.uniform(1, 3))
                 except Exception as e:
+                    time.sleep(random.uniform(1, 3))
                     logging.info(f"Could not complete application for {job_url}. Error: {e}")
             except Exception as e:
+                time.sleep(random.uniform(1, 3))
                 logging.info(f"Could not complete application for {job_url}. Error: {e}")
 
 
 if __name__ == "__main__":
     cookies_file_path = "cookies.json"
     bot = JobApplicationBot(ChromeDriverManager().install(), cookies_file_path)
-    job_search_query = "software engineer jobs site:join.com"
-    job_urls = bot.search_jobs_on_google(job_search_query)
-    bot.login_and_apply_to_jobs(job_urls)
+    job_search_queres = ['software engineer python site:join.com', 'software engineer angular site:join.com',
+                         'software engineer django site:join.com', 'Full Stack Developer site:join.com',
+                         'Frontend Engineer site:join.com', 'Backend Engineer site:join.com']
+    for job_search_query in job_search_queres:
+        try:
+            job_urls = bot.search_jobs_on_google(job_search_query)
+            print(job_urls)
+            bot.login_and_apply_to_jobs(job_urls)
+            time.sleep(random.uniform(10, 30))
+        except:
+            pass
