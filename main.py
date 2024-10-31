@@ -59,12 +59,12 @@ class JobApplicationBot:
                 ]
             except:
                 pass
-            
+
             if not job_urls:
                 self._initialize_driver()
                 n_pages = 3
                 for page in range(1, n_pages):
-                    url = "http://www.google.com/search?q=" + query + "&start=" + str((page - 1) * 10)
+                    url = f"http://www.google.com/search?q={query}&tbs=qdr:w&start={(page - 1) * 10}"
                     self.driver.get(url)
                     soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                     # soup = BeautifulSoup(r.text, 'html.parser')
@@ -109,23 +109,47 @@ class JobApplicationBot:
                         time.sleep(1)
                         self.driver.add_cookie(cookie)
                     self.driver.refresh()
+                    logged_in = True
                     time.sleep(random.uniform(1, 3))
 
+                retry_count = 0
+                max_retries = 5
+                skip_job = False
+                while retry_count < max_retries:
+                    try:
+                        form = self.driver.find_element(By.XPATH, "//form[@data-testid='ApplyStep1Form']")
+                        if form.find_elements(By.XPATH,
+                                              ".//a[@data-testid='ViewApplicationLink']") or form.find_elements(
+                            By.XPATH, ".//a[@data-testid='CompleteApplicationLink']"):
+                            logging.info(f"Already applied for {job_url}. Skipping.")
+                            skip_job = True
+                            break
+
+                        apply_button = form.find_element(By.XPATH, ".//button[@type='submit']")
+
+                        time.sleep(random.uniform(1, 4))
+                        apply_button.click()
+                        self.driver.execute_script("arguments[0].click();", apply_button)
+                        break
+                    except NoSuchElementException:
+                        skip_job = True
+                        break
+                    except Exception as e:
+                        logging.warning(f"Attempt {retry_count + 1} failed for {job_url}. Error: {e}")
+                        retry_count += 1
+                        if retry_count < max_retries:
+                            logging.info("Retrying...")
+                            self.driver.refresh()
+                            time.sleep(random.uniform(1, 3))
+                        else:
+                            skip_job = True
+                            logging.error(f"Failed to apply for {job_url} after {max_retries} attempts.")
+
+                if skip_job:
+                    continue
+
                 try:
-                    form = self.driver.find_element(By.XPATH, "//form[@data-testid='ApplyStep1Form']")
-                    logged_in = True
-                    apply_button = form.find_element(By.XPATH, ".//button[@type='submit']")
-
-                    time.sleep(random.uniform(1, 4))
-                    self.driver.execute_script("arguments[0].click();", apply_button)
-                    logging.error(f"Applied for the {job_url} successfully")
-
-                    time.sleep(random.uniform(15, 25))
-                except NoSuchElementException:
-                    logging.info("No Recaptcha error found. Proceeding with application.")
-
-                try:
-                    # time.sleep(random.uniform(15, 25))
+                    time.sleep(random.uniform(10, 20))
                     form = self.driver.find_element(By.XPATH, "//form[@id='OnePagerForm']")
                     questions = form.find_elements(By.XPATH, ".//div[@data-testid='QuestionItem']")
 
@@ -134,18 +158,18 @@ class JobApplicationBot:
                         answer_field = question.find_element(By.XPATH, ".//div[@data-testid='QuestionAnswer']")
                         time.sleep(random.uniform(1, 3))
 
-                        if "reside in" in question_text or "currently legally permitted to work in" in question_text:
+                        if "reside in" in question_text or "currently legally permitted" in question_text:
                             answer = config_data.get("reside_in_barcelona", "No")
                             yes_no_field = answer_field.find_element(By.XPATH,
                                                                      f".//div[@data-testid='{answer}Answer']")
                             self.driver.execute_script("arguments[0].click();", yes_no_field)
 
-                        elif "available to start" in question_text or "available to start working" in question_text:
+                        elif "available to start" in question_text or "available to start working" in question_text or "earliest date you could start" in question_text:
                             start_date = config_data.get("start_date", "")
                             date_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
                             date_input.send_keys(start_date)
 
-                        elif "expected yearly compensation" in question_text:
+                        elif "expected yearly compensation" in question_text or "salary range" in question_text:
                             compensation = config_data.get("expected_compensation", "")
                             compensation_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
                             compensation_input.send_keys(compensation)
@@ -171,7 +195,7 @@ class JobApplicationBot:
                             experience_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
                             experience_input.send_keys(experience)
 
-                        elif "city do you currently live in" in question_text:
+                        elif "currently live" in question_text or "currently located" in question_text:
                             experience = config_data.get("current_city", "Lahore, Pakistan")
                             experience_input = answer_field.find_element(By.XPATH, ".//input[@type='text']")
                             experience_input.send_keys(experience)
@@ -183,10 +207,9 @@ class JobApplicationBot:
 
                     submit_button = form.find_element(By.XPATH, ".//button[@type='submit']")
                     self.driver.execute_script("arguments[0].click();", submit_button)
+                    time.sleep(random.uniform(10, 15))
                     with open("applied.txt", "a") as file:
                         file.write(f"{job_url}\n")
-
-                    time.sleep(random.uniform(1, 3))
                 except Exception as e:
                     time.sleep(random.uniform(1, 3))
                     logging.info(f"Could not complete application for {job_url}. Error: {e}")
@@ -198,9 +221,9 @@ class JobApplicationBot:
 if __name__ == "__main__":
     cookies_file_path = "cookies.json"
     bot = JobApplicationBot(ChromeDriverManager().install(), cookies_file_path)
-    job_search_queres = ['software engineer python site:join.com', 'software engineer angular site:join.com',
-                         'software engineer django site:join.com', 'Full Stack Developer site:join.com',
-                         'Frontend Engineer site:join.com', 'Backend Engineer site:join.com']
+    job_search_queres = ['"software engineer" python site:join.com', '"software engineer" angular site:join.com',
+                         '"software engineer" django site:join.com', '"Full Stack Developer" site:join.com',
+                         '"Frontend Engineer" site:join.com', '"Backend Engineer" site:join.com']
     for job_search_query in job_search_queres:
         try:
             job_urls = bot.search_jobs_on_google(job_search_query)
