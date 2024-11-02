@@ -1,0 +1,79 @@
+{
+    "name": "Muhammad Abdullah",
+    "contact": {
+      "location": "Lahore, Pakistan",
+      "phone": "+92 300 3731919",
+      "email": "ranahaani@gmail.com",
+      "github": "https://github.com/ranahaani",
+      "linkedin": "https://www.linkedin.com/in/ranahaani"
+    },
+    "experience": [
+      {
+        "company": "Xref",
+        "location": "Remote",
+        "position": "Full Stack Developer",
+        "dates": "Aug 2023 – Present",
+        "responsibilities": [
+          "Led the end-to-end development of Django APIs, utilizing RESTful best practices and integrating seamlessly with Angular, enhancing system features and strengthening a scalable microservices architecture.",
+          "Optimized codebase for efficiency, contributing to a 25% improvement in system scalability and capabilities."
+        ]
+      },
+      {
+        "company": "Squibler.io",
+        "location": "Remote",
+        "position": "Full Stack Developer",
+        "dates": "Mar 2022 – Aug 2023",
+        "responsibilities": [
+          "Implemented Version History feature with Angular and Django, using GraphQL for backend API development and NgRx for frontend state management, leading to a 12% increase in platform pricing and revenue boost.",
+          "Enhanced user experience by implementing skeleton loaders, replacing slow loading spinners, and reducing screen wait times by 5%, leading to higher user satisfaction and engagement.",
+          "Streamlined backend application by upgrading from Django 2.2 to 3.2, reducing technical debt and eliminating over 5000+ lines of code, resulting in a more efficient and high-performing system."
+        ]
+      },
+      {
+        "company": "Five Rivers Technologies",
+        "location": "Lahore, Pakistan",
+        "position": "Python/Django Developer",
+        "dates": "Jul 2020 – Mar 2022",
+        "responsibilities": [
+          "Designed a recommendation system in Python that analyzed user communications to suggest relevant content, resulting in a 13% increase in user engagement.",
+          "Designed and implemented RESTful APIs using Django REST Framework, enabling efficient communication with the Gmail API in Python to process user emails.",
+          "Used Celery as a task queue and Redis as a messaging broker to execute asynchronous and periodic tasks, improving app performance by 33%."
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "name": "GNews, PyPi Package",
+        "dates": "2020 – Present",
+        "description": "An open source lightweight Python package that provides an API to search for articles on Google News and returns a usable JSON response. This repository has 700+ stars on GitHub."
+      },
+      {
+        "name": "Haroof-E-Tahaji Handwritten Letter Recognizer, CNN Model",
+        "dates": "2020",
+        "description": "Created a deep learning model for Urdu handwritten letters recognition in Python using CNN, developed from scratch with over 175,000 data samples."
+      }
+    ],
+    "education": {
+      "institution": "University of Central Punjab",
+      "location": "Lahore, Pakistan",
+      "degree": "Bachelor of Computer Science",
+      "cgpa": "3.35/4.0",
+      "dates": "Apr 2016 – Jul 2020",
+      "achievements": ["Dean’s List 2020 (Top 10%)"],
+      "relevant_courses": [
+        "Programming Fundamentals",
+        "Object-Oriented Programming",
+        "Data Structures",
+        "Databases",
+        "Operating Systems",
+        "Compiler Construction"
+      ]
+    },
+    "skills": {
+      "languages": ["Python", "JavaScript", "TypeScript", "C++", "HTML", "CSS", "GraphQL", "SQL"],
+      "frameworks": ["Django", "Angular", "Django REST Framework", "Flask", "Apollo GraphQL", "Selenium"],
+      "databases_and_cloud_infrastructure": ["MySQL", "PostgreSQL", "MongoDB", "Firebase", "AWS", "Docker"],
+      "tools": ["Jira", "Linux", "Git", "GitHub", "PyCharm", "Datadog", "Jupyter Notebook"]
+    }
+  }
+  
