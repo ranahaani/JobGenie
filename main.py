@@ -24,7 +24,7 @@ class JobApplicationBot:
         self.cookies_file = cookies_file
         self.chrome_options = Options()
         self.chrome_options.add_argument("--no-sandbox")
-        self.chrome_options.add_argument("--headless")
+        # self.chrome_options.add_argument("--headless")
         self.chrome_options.add_argument("--disable-dev-shm-usage")
         self.driver = None
 
@@ -41,13 +41,6 @@ class JobApplicationBot:
             job_urls = []
             with open('applied.txt', 'r') as file:
                 applied_urls = file.read().splitlines()
-            # try:
-            #     job_urls = [
-            #         url for url in search(query, num=100, stop=100, pause=3, tbs='qdr:d')
-            #         if site_filter in url and url not in applied_urls
-            #     ]
-            # except Exception as e:
-            #     logging.error(f"Error during Google search: {e}")
 
             if not job_urls:
                 self._initialize_driver()
@@ -152,23 +145,33 @@ class JobApplicationBot:
                             cover_letter_input.send_keys(os.path.abspath("cover_letter.pdf"))
 
                         apply_button = form.find_element(By.XPATH, ".//button[@type='submit']")
-                        time.sleep(random.uniform(1, 4))
                         apply_button.click()
-                        break
+                        time.sleep(random.uniform(10, 20))
+                        
+                        try:
+
+                            captcha_error = form.find_elements(By.XPATH,
+                                                               ".//div[contains(text(), 'Recaptcha token is invalid')]")
+                            if captcha_error:
+                                logging.warning("Captcha detected. Retrying...")
+                                retry_count += 1
+                                if retry_count < max_retries:
+                                    self.driver.refresh()
+                                    time.sleep(random.uniform(1, 3))
+                                else:
+                                    skip_job = True
+                                    logging.error(
+                                        f"Failed to apply for {job_url} due to captcha after {max_retries} attempts.")
+                            else:
+                                break
+                        except:
+                            break
                     except NoSuchElementException:
                         skip_job = True
                         break
                     except Exception as e:
-                        logging.warning(f"Attempt {retry_count + 1} failed for {job_url}. Error: {e}")
-                        retry_count += 1
-                        if retry_count < max_retries:
-                            logging.info("Retrying...")
-                            self.driver.refresh()
-                            time.sleep(random.uniform(1, 3))
-                        else:
-                            skip_job = True
-                            logging.error(f"Failed to apply for {job_url} after {max_retries} attempts.")
-
+                        skip_job = True
+                        logging.error(f"Failed to apply for {job_url} after {max_retries} attempts.")
                 if skip_job:
                     continue
 
