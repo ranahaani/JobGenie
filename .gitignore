@@ -12,8 +12,10 @@ venv/
 # Ignore log files
 *.log
 
-# Ignore cookies file
 cookies.json
+resume.json
+cover_letter.pdf
+applied.txt
 
 # Ignore IDE specific files
 .idea/
