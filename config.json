@@ -5,5 +5,8 @@
     "english_proficiency": "Professional working proficiency",
     "require_sponsorship": "Yes",
     "react_experience": "3",
-    "skills": ["React", "Python", "Angular", "Django"]
+    "skills": ["React", "Python", "Angular", "Django"],
+    "german_proficiency": "None",
+    "current_city": "Lahore, Pakistan",
+    "remotely_available": "Yes"
 }
