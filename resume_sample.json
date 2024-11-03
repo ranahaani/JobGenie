@@ -1,0 +1,64 @@
+{
+    "name": "John Doe",
+    "contact": {
+      "location": "New York, USA",
+      "phone": "+1 555 1234567",
+      "email": "johndoe@example.com",
+      "github": "https://github.com/johndoe",
+      "linkedin": "https://www.linkedin.com/in/johndoe"
+    },
+    "experience": [
+      {
+        "company": "Tech Solutions",
+        "location": "Remote",
+        "position": "Software Engineer",
+        "dates": "Jan 2022 – Present",
+        "responsibilities": [
+          "Developed and maintained web applications using React and Node.js, improving user engagement by 20%.",
+          "Collaborated with cross-functional teams to design scalable software solutions."
+        ]
+      },
+      {
+        "company": "Innovatech",
+        "location": "San Francisco, USA",
+        "position": "Junior Developer",
+        "dates": "Jun 2020 – Dec 2021",
+        "responsibilities": [
+          "Assisted in the development of a mobile application using Flutter, resulting in a 15% increase in user retention.",
+          "Participated in code reviews and contributed to improving code quality."
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "name": "Weather App",
+        "dates": "2021",
+        "description": "A mobile application that provides real-time weather updates and forecasts using OpenWeatherMap API."
+      },
+      {
+        "name": "Portfolio Website",
+        "dates": "2020",
+        "description": "A personal portfolio website showcasing projects and skills, built with HTML, CSS, and JavaScript."
+      }
+    ],
+    "education": {
+      "institution": "State University",
+      "location": "New York, USA",
+      "degree": "Bachelor of Science in Computer Science",
+      "cgpa": "3.8/4.0",
+      "dates": "Sep 2016 – May 2020",
+      "achievements": ["Graduated with Honors"],
+      "relevant_courses": [
+        "Algorithms and Data Structures",
+        "Web Development",
+        "Database Systems",
+        "Software Engineering"
+      ]
+    },
+    "skills": {
+      "languages": ["JavaScript", "Python", "Java", "HTML", "CSS"],
+      "frameworks": ["React", "Node.js", "Express", "Flutter"],
+      "databases_and_cloud_infrastructure": ["MySQL", "Firebase", "AWS"],
+      "tools": ["Git", "Docker", "Jira", "VS Code"]
+    }
+  }
