@@ -148,8 +148,8 @@ for idx, url in enumerate(job_urls, 1):
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone git@github.com:ranahaani/JobGenie.git
+   cd JobGenie
    ```
 
 2. **Install the required packages**:
