@@ -11,6 +11,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
+from browser_stealth import BrowserStealth
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +45,7 @@ class GoogleSearchScraper:
             fallback='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
         self.driver = None
         self.current_proxy_index = 0
+        self.stealth = BrowserStealth(use_proxy=bool(proxy_list))
 
     def _get_random_delay(self, min_delay: float = 1.0, max_delay: float = 3.0) -> float:
         """Get a random delay within range to appear more human-like."""
@@ -83,17 +85,11 @@ class GoogleSearchScraper:
         if self.driver:
             return
 
-        options = Options()
+        # Configure options with stealth settings
+        options = self.stealth.configure_options()
+        
         if self.headless:
             options.add_argument('--headless=new')
-
-        # Anti-detection measures
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_argument(f'--user-agent={self.user_agent.random}')
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
 
         # Set proxy if available
         if self.proxy_list:
@@ -107,10 +103,9 @@ class GoogleSearchScraper:
             service = Service(ChromeDriverManager().install())
 
         self.driver = webdriver.Chrome(service=service, options=options)
-
-        # Execute CDP commands to mask WebDriver usage
-        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": self.user_agent.random})
+        
+        # Apply stealth patches
+        self.stealth.apply_stealth_patches(self.driver)
 
     def _quit_selenium(self) -> None:
         """Quit the Selenium WebDriver."""
@@ -172,6 +167,13 @@ class GoogleSearchScraper:
                 return True
 
         return False
+
+    def _simulate_human_behavior(self) -> None:
+        """Simulate human-like behavior on the page."""
+        if not self.driver:
+            return
+            
+        self.stealth.simulate_human_behavior(self.driver)
 
     def extract_urls_from_html(self, html_content: str, domain_filter: Optional[str] = None) -> List[str]:
         """Extract URLs from Google search results HTML, enforcing domain-specific patterns.
@@ -376,6 +378,7 @@ class GoogleSearchScraper:
 
                 # Prepare search URL
                 search_url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&start={start_index}&tbs=qdr:w"
+                
                 # Add a random delay between pages
                 if page > 0:
                     time.sleep(self._get_random_delay(2.0, 5.0))
@@ -390,8 +393,8 @@ class GoogleSearchScraper:
                         # Wait for page to load
                         time.sleep(self._get_random_delay(2.0, 4.0))
 
-                        # Simulate human-like scrolling
-                        self._simulate_scrolling()
+                        # Simulate human-like behavior
+                        self._simulate_human_behavior()
 
                         # Check for CAPTCHA
                         if self._detect_captcha(self.driver):
@@ -439,34 +442,6 @@ class GoogleSearchScraper:
             self._quit_selenium()
 
         return all_urls
-
-    def _simulate_scrolling(self):
-        """Simulate human-like scrolling behavior."""
-        if not self.driver:
-            return
-
-        try:
-            # Get page height
-            page_height = self.driver.execute_script("return document.body.scrollHeight")
-
-            # Scroll down in smaller increments
-            current_position = 0
-            scroll_step = random.randint(300, 700)  # Random scroll amount
-
-            while current_position < page_height:
-                scroll_amount = min(scroll_step, page_height - current_position)
-                self.driver.execute_script(f"window.scrollBy(0, {scroll_amount});")
-                current_position += scroll_amount
-
-                # Random pause between scrolls
-                time.sleep(random.uniform(0.2, 0.7))
-
-            # Scroll back up partially
-            self.driver.execute_script(f"window.scrollBy(0, {-random.randint(300, 800)});")
-            time.sleep(random.uniform(0.5, 1.0))
-
-        except Exception as e:
-            logger.debug(f"Error during scrolling simulation: {e}")
 
     def search(self, query: str, domain_filter: Optional[str] = None, num_pages: int = 3) -> List[str]:
         """Search Google and return URLs using fallback strategies.

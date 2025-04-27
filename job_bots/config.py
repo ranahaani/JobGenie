@@ -101,4 +101,13 @@ class PlatformConfig:
             }
         )
         
+        # Lever.co configuration
+        platforms['lever'] = PlatformConfig(
+            platform_name='lever',
+            # Lever doesn't typically require login for applications
+            custom_settings={
+                'use_analyzer': False,
+            }
+        )
+        
         return platforms 

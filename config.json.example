@@ -1,0 +1,12 @@
+{
+    "reside_in_barcelona": "Yes/No",
+    "start_date": "YYYY-MM-DD",
+    "expected_compensation": "50000",
+    "english_proficiency": "Professional working proficiency",
+    "require_sponsorship": "Yes/No",
+    "react_experience": "2",
+    "skills": ["React", "Python", "JavaScript", "TypeScript"],
+    "german_proficiency": "None/Basic/Fluent",
+    "current_city": "Your City, Country",
+    "remotely_available": "Yes/No"
+} 

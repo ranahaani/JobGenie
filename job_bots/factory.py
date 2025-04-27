@@ -34,6 +34,8 @@ class JobApplicationBotFactory:
             return 'join'
         elif 'boards.greenhouse.io' in url_lower or 'job-boards.greenhouse.io' in url_lower or 'greenhouse.io' in url_lower:
             return 'greenhouse'
+        elif 'lever.co' in url_lower or 'jobs.lever.co' in url_lower:
+            return 'lever'
         else:
             # Default to join.com for unknown platforms for now
             logger.warning(f"Unknown platform for URL: {url}")
@@ -54,7 +56,7 @@ class JobApplicationBotFactory:
             Appropriate job application bot instance
         """
         # Handle import here to avoid circular imports
-        from job_bots.platforms import JoinApplicationBot, GreenhouseApplicationBot
+        from job_bots.platforms import JoinApplicationBot, GreenhouseApplicationBot, LeverApplicationBot
         
         # Get the platform configuration
         platform_config = platform_configs.get(platform)
@@ -65,6 +67,9 @@ class JobApplicationBotFactory:
         if platform == 'greenhouse':
             logger.info("Creating Greenhouse application bot")
             return GreenhouseApplicationBot(driver_path, platform_config, cookies_file)
+        elif platform == 'lever':
+            logger.info("Creating Lever.co application bot")
+            return LeverApplicationBot(driver_path, platform_config, cookies_file)
         else:
             # Default to join.com
             logger.info("Creating Join.com application bot")

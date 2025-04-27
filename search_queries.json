@@ -1,6 +1,6 @@
 [
   {
-    "query": "\"Software Engineer\" python site:job-boards.greenhouse.io",
-    "site_filter": "greenhouse.io"
+    "query": "\"Software Engineer\" python site:lever.co",
+    "site_filter": "lever.co"
   }
 ]

@@ -7,6 +7,7 @@ from typing import List, Dict, Optional, Tuple, Any
 import json
 import logging
 import re
+import os
 
 from bs4 import BeautifulSoup
 from selenium.common.exceptions import NoSuchElementException
@@ -38,6 +39,8 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
         self.form_analyzer = GreenhouseFormAnalyzer()
         # To store current config for use in some methods
         self.current_config = None
+        # Resume data cache
+        self.resume_data_cache = None
 
     def _extract_job_details(self) -> Tuple[str, str, str]:
         """Extract job details from the Greenhouse job page.
@@ -87,7 +90,7 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
 
         # Greenhouse doesn't typically display HR contact names on job pages
         hr_name = self.DEFAULT_HR_NAME
-        
+
         # Look for company name to personalize
         try:
             company_element = self.driver.find_element(
@@ -114,12 +117,12 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                 "//p[contains(text(), 'already applied')]",
                 "//div[contains(@class, 'application-complete')]"
             ]
-            
+
             for indicator in applied_indicators:
                 elements = self.driver.find_elements(By.XPATH, indicator)
                 if elements:
                     return True
-            
+
             return False
         except Exception:
             return False
@@ -138,21 +141,114 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                 field = self.driver.find_element(By.ID, field_id)
                 field.clear()
                 field.send_keys(answer)
+
             elif field_type == "select":
-                # Handle dropdown selects
+                # Handle both traditional and React-based select components
                 field = self.driver.find_element(By.ID, field_id)
-                select = Select(field)
-                
-                # Try to find option by visible text or by value
+
+                # Check if it's a multi-select field by looking for "[]" in the id or name
+                is_multi_select = "[]" in field_id or field.get_attribute("multiple") == "true"
+
+                # Check if it's a React-based select
+                parent = None
                 try:
-                    select.select_by_visible_text(answer)
+                    parent = field.find_element(By.XPATH, "./ancestor::div[contains(@class, 'select-shell')]")
                 except:
-                    # If no exact match, try to find a similar option
-                    options = select.options
-                    for option in options:
-                        if answer.lower() in option.text.lower():
-                            select.select_by_visible_text(option.text)
-                            break
+                    pass
+
+                if parent:
+                    # React-based select handling
+                    # Click to open the dropdown
+                    self.driver.execute_script("arguments[0].click();", field)
+                    self._random_delay((0.5, 1))
+
+                    # For multi-select fields, we might need to select multiple options
+                    if is_multi_select and isinstance(answer, list):
+                        # Handle each answer in the list
+                        for single_answer in answer:
+                            try:
+                                # Try to find and click the option
+                                option = self.driver.find_element(
+                                    By.XPATH,
+                                    f"//div[contains(@class, 'select__option') and contains(text(), '{single_answer}')]"
+                                )
+                                self.driver.execute_script("arguments[0].click();", option)
+                                self._random_delay((0.5, 1))
+                            except NoSuchElementException:
+                                # If exact match not found, try partial match
+                                options = self.driver.find_elements(
+                                    By.XPATH,
+                                    "//div[contains(@class, 'select__option')]"
+                                )
+                                for option in options:
+                                    if single_answer.lower() in option.text.lower():
+                                        self.driver.execute_script("arguments[0].click();", option)
+                                        self._random_delay((0.5, 1))
+                                        break
+                    else:
+                        # Handle single selection (original code)
+                        try:
+                            option = self.driver.find_element(
+                                By.XPATH,
+                                f"//div[contains(@class, 'select__option') and contains(text(), '{answer}')]"
+                            )
+                            self.driver.execute_script("arguments[0].click();", option)
+                        except NoSuchElementException:
+                            # If exact match not found, try partial match
+                            options = self.driver.find_elements(
+                                By.XPATH,
+                                "//div[contains(@class, 'select__option')]"
+                            )
+                            for option in options:
+                                if answer.lower() in option.text.lower():
+                                    self.driver.execute_script("arguments[0].click();", option)
+                                    break
+                else:
+                    # Handle traditional select
+                    select = Select(field)
+
+                    if is_multi_select and isinstance(answer, list):
+                        # Handle multiple selections
+                        for single_answer in answer:
+                            try:
+                                select.select_by_visible_text(single_answer)
+                            except:
+                                # Try to find a similar option
+                                options = select.options
+                                for option in options:
+                                    if single_answer.lower() in option.text.lower():
+                                        select.select_by_visible_text(option.text)
+                                        break
+                    else:
+                        # Handle single selection (original code)
+                        try:
+                            select.select_by_visible_text(answer)
+                        except:
+                            # If no exact match, try to find a similar option
+                            options = select.options
+                            for option in options:
+                                if answer.lower() in option.text.lower():
+                                    select.select_by_visible_text(option.text)
+                                    break
+
+            elif field_type == "combobox":
+                # Handle combobox inputs (like location)
+                field = self.driver.find_element(By.ID, field_id)
+                field.clear()
+                field.send_keys(answer)
+                self._random_delay((0.5, 1))
+
+                # Try to select from dropdown if it appears
+                try:
+                    option = self.driver.find_element(
+                        By.XPATH,
+                        f"//div[contains(@class, 'select__option') and contains(text(), '{answer}')]"
+                    )
+                    self.driver.execute_script("arguments[0].click();", option)
+                except NoSuchElementException:
+                    # If no exact match in dropdown, just keep the typed value
+                    pass
+
             elif field_type == "checkbox":
                 # Handle checkboxes
                 if answer.lower() in ['yes', 'true', '1']:
@@ -163,9 +259,9 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                     field = self.driver.find_element(By.ID, field_id)
                     if field.is_selected():
                         field.click()
+
             elif field_type == "radio":
                 # Handle radio buttons
-                # In Greenhouse, radio buttons usually have labels after them
                 radio_group = self.driver.find_elements(By.NAME, field_id)
                 for radio in radio_group:
                     label_text = ""
@@ -177,130 +273,111 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                             label_text = label.text.strip().lower()
                     except:
                         pass
-                    
+
                     # Click the radio if its label matches our answer
-                    if answer.lower() in label_text or (answer.lower() == 'yes' and 'yes' in label_text):
+                    if answer.lower() in label_text:
                         radio.click()
                         break
-            elif field_type == "file" and "resume" in field_id.lower():
-                # Handle resume upload
+
+            elif field_type == "file":
+                # Handle file uploads
                 field = self.driver.find_element(By.ID, field_id)
-                # Assuming resume is stored at "resume.pdf"
-                field.send_keys(str(Path("resume.pdf").absolute()))
-            elif field_type == "file" and "cover_letter" in field_id.lower():
-                # Handle cover letter upload
-                field = self.driver.find_element(By.ID, field_id)
-                field.send_keys(str(Path("cover_letter.pdf").absolute()))
+
+                # Check if it's resume or cover letter
+                if "resume" in field_id.lower():
+                    # Use the specific resume file
+                    resume_path = answer if answer and Path(answer).exists() else "Abdullah_Resume.pdf"
+                    field.send_keys(str(Path(resume_path).absolute()))
+                elif "cover_letter" in field_id.lower():
+                    field.send_keys(str(Path("cover_letter.pdf").absolute()))
+                elif answer:  # For any other file upload with a specified path
+                    field.send_keys(str(Path(answer).absolute()))
+
             elif field_type == "textarea":
                 # Handle text areas
                 field = self.driver.find_element(By.ID, field_id)
                 field.clear()
                 field.send_keys(answer)
-                
+
+            # Check if field is required and not filled
+            try:
+                is_required = field.get_attribute("aria-required") == "true"
+                is_invalid = field.get_attribute("aria-invalid") == "true"
+                if is_required and is_invalid:
+                    logger.warning(f"Required field {field_id} appears to be invalid after filling")
+            except:
+                pass
+
             logger.info(f"Filled field {field_id} of type {field_type} with answer")
+
         except Exception as e:
             logger.error(f"Error handling field {field_id}: {e}")
 
-    def _map_config_to_greenhouse_fields(self, config: ApplicationConfig) -> Dict[str, str]:
-        """Map application config to Greenhouse field types.
+    def _handle_demographic_section(self, config: ApplicationConfig) -> None:
+        """Handle the demographic questions section of the form.
         
         Args:
             config: Application configuration
-            
-        Returns:
-            Dictionary mapping field types to answers
-        """
-        # Common field mappings for Greenhouse
-        return {
-            "first_name": "FIRST_NAME_FROM_RESUME",  # Will need to extract from resume
-            "last_name": "LAST_NAME_FROM_RESUME",  # Will need to extract from resume
-            "email": "EMAIL_FROM_RESUME",  # Will need to extract from resume
-            "phone": "PHONE_FROM_RESUME",  # Will need to extract from resume
-            "location": config.current_city,
-            "visa": "Yes" if config.require_sponsorship == "Yes" else "No",
-            "start_date": config.start_date,
-            "salary": config.expected_compensation,
-            "remote": "Yes" if config.remotely_available == "Yes" else "No",
-            "experience": config.react_experience,
-            "english": config.english_proficiency,
-            "german": config.german_proficiency,
-            "skills": ", ".join(config.skills),
-        }
-
-    def _handle_field_by_label(self, label_text: str, answer: str) -> bool:
-        """Handle a form field based on its label text.
-        
-        Args:
-            label_text: The label text of the field
-            answer: The answer to fill in
-            
-        Returns:
-            Boolean indicating if the field was handled
-        """
-        # Common label patterns in Greenhouse forms
-        label_patterns = {
-            "name": "first_name, last_name",
-            "first name": "first_name",
-            "last name": "last_name",
-            "email": "email",
-            "phone": "phone",
-            "location": "location, current_city",
-            "address": "location",
-            "city": "current_city",
-            "authorized to work": "visa, require_sponsorship",
-            "legally authorized": "visa, require_sponsorship",
-            "require visa sponsorship": "visa, require_sponsorship",
-            "require sponsorship": "visa, require_sponsorship",
-            "work remotely": "remote, remotely_available",
-            "start date": "start_date",
-            "when can you start": "start_date",
-            "availability": "start_date",
-            "salary": "salary, expected_compensation",
-            "compensation": "salary, expected_compensation",
-            "english proficiency": "english, english_proficiency",
-            "proficiency in english": "english, english_proficiency",
-            "german proficiency": "german, german_proficiency",
-            "proficiency in german": "german, german_proficiency",
-            "years of experience": "experience, react_experience",
-            "work experience": "experience, react_experience",
-        }
-        
-        for pattern, field_keys in label_patterns.items():
-            if pattern in label_text.lower():
-                field_key_list = [k.strip() for k in field_keys.split(",")]
-                for field_key in field_key_list:
-                    # Try to map the field and answer
-                    field_mapping = self._map_config_to_greenhouse_fields(self.current_config)
-                    if field_key in field_mapping:
-                        return True
-                
-        return False
-
-    def _extract_resume_data(self) -> Dict[str, str]:
-        """Extract basic information from resume.json.
-        
-        Returns:
-            Dictionary with basic resume info
         """
         try:
-            with open('resume.json', 'r') as file:
-                resume_data = json.load(file)
-                
-            info = {
-                "first_name": resume_data["name"].split()[0] if resume_data.get("name") else "",
-                "last_name": resume_data["name"].split()[-1] if resume_data.get("name") else "",
-                "email": resume_data.get("contact", {}).get("email", ""),
-                "phone": resume_data.get("contact", {}).get("phone", ""),
-            }
-            return info
+            # Handle Gender
+            self._handle_greenhouse_form_field("4024662004", "select", config.gender)
+
+            # Handle Gender Identity (new field)
+            gender_identity = config.gender_identity if hasattr(config, 'gender_identity') else "Prefer not to say"
+            self._handle_greenhouse_form_field("4024663004", "select", gender_identity)
+
+            # Handle Pronouns (new field)
+            pronouns = config.pronouns if hasattr(config, 'pronouns') else "Prefer not to say"
+            self._handle_greenhouse_form_field("4024664004", "select", pronouns)
+
+            # Handle Sexual Orientation (new field)
+            sexual_orientation = config.sexual_orientation if hasattr(config,
+                                                                      'sexual_orientation') else "Prefer not to say"
+            self._handle_greenhouse_form_field("4024665004", "select", sexual_orientation)
+
+            # Handle Hispanic/Latinx question (new field)
+            hispanic_latinx = config.hispanic_latinx if hasattr(config, 'hispanic_latinx') else "Prefer not to say"
+            self._handle_greenhouse_form_field("4024666004", "select", hispanic_latinx)
+
+            # Handle Race/Ethnicity
+            self._handle_greenhouse_form_field("4024667004", "select", config.ethnicity)
+
+            # Handle Veteran Status
+            self._handle_greenhouse_form_field("4024668004", "select", config.veteran_status)
+
+            # Handle Disability Status
+            self._handle_greenhouse_form_field("4024669004", "select", config.disability_status)
+
+            logger.info("Completed demographic section")
+
         except Exception as e:
-            logger.error(f"Error extracting resume data: {e}")
-            return {
-                "first_name": "",
-                "last_name": "",
-                "email": "",
-                "phone": "",
-            }
+            logger.error(f"Error handling demographic section: {e}")
+
+    def _handle_sony_specific_questions(self, config: ApplicationConfig) -> None:
+        """Handle Sony-specific questions in the application form.
+        
+        Args:
+            config: Application configuration
+        """
+        try:
+            # Handle previous Sony employment
+            self._handle_greenhouse_form_field("question_13103294004", "select",
+                                               config.previous_employment if hasattr(config,
+                                                                                     'previous_employment') else "No")
+
+            # Handle relocation assistance
+            self._handle_greenhouse_form_field("question_13103297004", "select",
+                                               config.need_relocation if hasattr(config, 'need_relocation') else "Yes")
+
+            # Handle certification checkbox
+            self._handle_greenhouse_form_field("question_13103300004", "select", "Yes")
+
+            logger.info("Completed Sony-specific questions")
+
+        except Exception as e:
+            logger.error(f"Error handling Sony-specific questions: {e}")
+
 
     def _handle_application_form(self, config: ApplicationConfig) -> bool:
         """Handle the Greenhouse application form.
@@ -313,39 +390,41 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
         """
         # Store config for use in other methods
         self.current_config = config
-        
-        # Extract form fields using the analyzer
+
         try:
-            # Try to get the HTML content for analysis
+            # Get the HTML content for analysis
             html_content = self.driver.page_source
             soup = BeautifulSoup(html_content, 'html.parser')
-            
-            form = soup.find('form', id='application_form')
+
+            # Find the application form
+            form = soup.find('form', id='application-form')
             if not form:
                 logger.warning("Application form not found, looking for apply button")
-                # Try to find and click the apply button
                 apply_buttons = self.driver.find_elements(
-                    By.XPATH, 
+                    By.XPATH,
                     "//a[contains(text(), 'Apply') or contains(@class, 'apply') or contains(@id, 'apply')]"
                 )
                 if apply_buttons:
                     self.driver.execute_script("arguments[0].click();", apply_buttons[0])
                     self._random_delay(self.RETRY_DELAY)
-                    
-                    # Get updated page source
                     html_content = self.driver.page_source
-            
-            # Use the analyzer to extract field information
+
+            # Extract field information
             fields_info = self.form_analyzer.extract_form_fields(BeautifulSoup(html_content, 'html.parser'))
-            
-            # Get resume data for filling personal info
+
+            # Log all extracted fields for debugging
+            logger.info(f"Extracted fields from form:")
+            for category, fields in fields_info.items():
+                logger.info(f"  {category}: {len(fields)} fields")
+
+            # Get resume data
             resume_data = self._extract_resume_data()
-            
+
             # Fill basic info fields
             for field in fields_info.get("basic_info", []):
                 field_id = field["id"]
                 field_type = field["type"]
-                
+
                 if "first_name" in field_id:
                     self._handle_greenhouse_form_field(field_id, field_type, resume_data["first_name"])
                 elif "last_name" in field_id:
@@ -355,54 +434,121 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                 elif "phone" in field_id:
                     self._handle_greenhouse_form_field(field_id, field_type, resume_data["phone"])
                 elif "location" in field_id or "address" in field_id:
-                    self._handle_greenhouse_form_field(field_id, field_type, config.current_city)
-                
+                    self._handle_greenhouse_form_field(field_id, "combobox", config.current_city)
+
                 self._random_delay((0.5, 1))
-            
+
             # Handle resume upload
             for field in fields_info.get("resume_upload", []):
                 field_id = field["id"]
-                self._handle_greenhouse_form_field(field_id, "file", "")
+                # Use the specific resume file path provided in the config
+                self._handle_greenhouse_form_field(field_id, "file", "Abdullah_Resume.pdf")
                 self._random_delay((0.5, 1))
-            
+
             # Handle cover letter upload if needed
             for field in fields_info.get("cover_letter_upload", []):
                 field_id = field["id"]
-                # Make sure we have a cover letter generated
                 job_title, job_description, hr_name = self._extract_job_details()
                 cover_letter_path = self.generate_cover_letter(job_title, job_description, hr_name)
                 self._handle_greenhouse_form_field(field_id, "file", cover_letter_path)
                 self._random_delay((0.5, 1))
-            
+
+            # Handle Sony-specific questions
+            self._handle_sony_specific_questions(config)
+            self._random_delay((0.5, 1))
+
+            # Handle technical questions with resume data
+            self._handle_technical_questions(resume_data)
+            self._random_delay((0.5, 1))
+
+            # Handle demographic section if present
+            if soup.find('div', id='demographic-section'):
+                self._handle_demographic_section(config)
+                self._random_delay((0.5, 1))
+
+            # Handle education section if present
+            education_container = soup.find('div', class_='education--container')
+            if education_container:
+                self._handle_education_section(soup, fields_info)
+                self._random_delay((0.5, 1))
+
             # Handle custom questions
             for field in fields_info.get("custom_questions", []):
                 field_id = field["id"]
                 field_type = field["type"]
                 label_text = field["label"]
-                
+
+                # Skip fields we've already handled in specific methods
+                if field_id in ["question_13169191004", "question_13169192004", "question_13183961004",
+                                "question_13183962004", "question_13183963004", "question_13183964004",
+                                "question_13183965004", "question_13103294004", "question_13103297004",
+                                "question_13103300004"]:
+                    continue
+
                 # Try to handle by label
                 handled = False
-                
-                # Check for questions about work authorization or visa
-                if "visa" in label_text.lower() or "sponsorship" in label_text.lower() or "authorized" in label_text.lower():
-                    self._handle_greenhouse_form_field(field_id, field_type, "Yes" if config.require_sponsorship == "Yes" else "No")
+
+                # Check for questions about LinkedIn or social profiles
+                if "linkedin" in label_text.lower() or "social" in label_text.lower():
+                    linkedin = self.resume_data_cache.get("contact", {}).get("linkedin",
+                                                                             "") if self.resume_data_cache else ""
+                    self._handle_greenhouse_form_field(field_id, field_type, linkedin)
                     handled = True
-                
+
+                # Check for questions about website or portfolio
+                elif "website" in label_text.lower() or "portfolio" in label_text.lower():
+                    github = self.resume_data_cache.get("contact", {}).get("github",
+                                                                           "") if self.resume_data_cache else ""
+                    self._handle_greenhouse_form_field(field_id, field_type, github)
+                    handled = True
+
+                # Check for questions about work authorization or visa
+                elif "visa" in label_text.lower() or "sponsorship" in label_text.lower() or "authorized" in label_text.lower() or "legally" in label_text.lower():
+                    self._handle_greenhouse_form_field(field_id, field_type,
+                                                       "Yes" if config.require_sponsorship == "Yes" else "No")
+                    handled = True
+
+                # Check for questions about sources (how did you hear about us)
+                elif "hear about" in label_text.lower() and field_type == "checkbox":
+                    # Use the dedicated method for checkbox groups
+                    self._handle_job_source_checkboxes(field_id)
+                    handled = True
+
                 # Check for questions about start date
                 elif "start" in label_text.lower() or "available" in label_text.lower():
                     self._handle_greenhouse_form_field(field_id, field_type, config.start_date)
                     handled = True
-                
+
                 # Check for questions about compensation
                 elif "compensation" in label_text.lower() or "salary" in label_text.lower():
                     self._handle_greenhouse_form_field(field_id, field_type, config.expected_compensation)
                     handled = True
-                
+
+                # Check for questions about metropolitan area location
+                elif "metropolitan" in label_text.lower() or "west coast" in label_text.lower():
+                    # Use dedicated handler
+                    self._handle_metropolitan_area_question(field_id)
+                    handled = True
+
+                # Check for questions about education/degree
+                elif "bachelor" in label_text.lower() or "degree" in label_text.lower() or "computer science" in label_text.lower():
+                    self._handle_greenhouse_form_field(field_id, field_type, "Yes")
+                    handled = True
+
+                # Check for questions about programming experience
+                elif "python" in label_text.lower():
+                    self._handle_greenhouse_form_field(field_id, field_type, "Yes")
+                    handled = True
+                elif "c++" in label_text.lower():
+                    self._handle_greenhouse_form_field(field_id, field_type, "No")
+                    handled = True
+
                 # Check for questions about remote work
                 elif "remote" in label_text.lower():
-                    self._handle_greenhouse_form_field(field_id, field_type, "Yes" if config.remotely_available == "Yes" else "No")
+                    self._handle_greenhouse_form_field(field_id, field_type,
+                                                       "Yes" if config.remotely_available == "Yes" else "No")
                     handled = True
-                
+
                 # Check for questions about language proficiency
                 elif "english" in label_text.lower():
                     self._handle_greenhouse_form_field(field_id, field_type, config.english_proficiency)
@@ -410,63 +556,84 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                 elif "german" in label_text.lower():
                     self._handle_greenhouse_form_field(field_id, field_type, config.german_proficiency)
                     handled = True
-                
+
                 # Check for questions about experience
                 elif "experience" in label_text.lower():
                     self._handle_greenhouse_form_field(field_id, field_type, config.react_experience)
                     handled = True
-                
-                # If not handled by our patterns, try to use a default answer
+
+                # Check for questions about family members or relatives
+                elif "family" in label_text.lower() or "relative" in label_text.lower():
+                    self._handle_greenhouse_form_field(field_id, field_type, "No")
+                    handled = True
+
+                # Check for questions about regulatory (FDA/OIG)
+                elif "debarred" in label_text.lower() or "fda" in label_text.lower() or "oig" in label_text.lower():
+                    self._handle_greenhouse_form_field(field_id, field_type, "No")
+                    handled = True
+
+                # If not handled by our patterns, use AI to generate an answer
                 if not handled:
-                    if field_type == "text" or field_type == "textarea":
-                        self._handle_greenhouse_form_field(field_id, field_type, "Please see my resume for details")
-                    elif field_type == "select":
-                        # For selects, we'll need to find a suitable option
-                        pass
-                    elif field_type == "checkbox" or field_type == "radio":
-                        # For checkboxes, choose a sensible default (usually 'yes' is better)
-                        self._handle_greenhouse_form_field(field_id, field_type, "Yes")
-                
+                    ai_answer = self._handle_unknown_field_with_ai(field_id, field_type, label_text)
+                    self._handle_greenhouse_form_field(field_id, field_type, ai_answer)
+
                 self._random_delay((0.5, 1))
-            
+
             # Submit the form
             submit_button = self.driver.find_element(
-                By.XPATH, 
+                By.XPATH,
                 "//button[@type='submit' or contains(@class, 'submit') or contains(text(), 'Submit')]"
             )
             self.driver.execute_script("arguments[0].click();", submit_button)
             self._random_delay(self.SUBMISSION_DELAY)
-            
+
             # Check for errors or confirmation
             error_elements = self.driver.find_elements(
-                By.XPATH, 
+                By.XPATH,
                 "//div[contains(@class, 'error') or contains(@class, 'alert')]"
             )
-            
+
             if error_elements:
                 logger.warning("Form submission had errors, attempting to fix and resubmit")
-                # Handle errors and try again (simplified for now)
+                # Try to fix any invalid fields
+                for error in error_elements:
+                    try:
+                        error_id = error.get_attribute("id")
+                        if error_id:
+                            field_id = error_id.replace("-error", "")
+                            field = self.driver.find_element(By.ID, field_id)
+                            field_type = field.get_attribute("type") or "select"
+
+                            # Try to fix the field with AI assistance
+                            label_elem = self.driver.find_element(By.XPATH, f"//label[@for='{field_id}']")
+                            label_text = label_elem.text if label_elem else field_id
+                            ai_answer = self._handle_unknown_field_with_ai(field_id, field_type, label_text)
+                            self._handle_greenhouse_form_field(field_id, field_type, ai_answer)
+                    except:
+                        continue
+
+                # Try submitting again
                 submit_button = self.driver.find_element(
-                    By.XPATH, 
+                    By.XPATH,
                     "//button[@type='submit' or contains(@class, 'submit') or contains(text(), 'Submit')]"
                 )
                 self.driver.execute_script("arguments[0].click();", submit_button)
                 self._random_delay(self.SUBMISSION_DELAY)
-            
+
             # Check for confirmation
             confirmation_elements = self.driver.find_elements(
-                By.XPATH, 
+                By.XPATH,
                 "//div[contains(@class, 'confirmation') or contains(@class, 'success') or contains(text(), 'Thank you')]"
             )
-            
+
             if confirmation_elements:
                 logger.info("Application submitted successfully")
                 return True
-            
+
             # If we can't confirm success or failure, assume success
             logger.info("Application appears to be submitted, but couldn't confirm")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error in handling application form: {e}")
             return False
@@ -482,34 +649,34 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
             Boolean indicating if application was successful
         """
         logger.info(f"Applying to Greenhouse job: {job_url}")
-        
+
         # Check if already applied using utility function
         if is_already_applied(job_url):
             logger.info(f"Already applied for {job_url} (found in applied.txt). Skipping.")
             return False
-            
+
         self.driver.get(job_url)
         self._random_delay((1, 3))
-        
+
         # Check if already applied based on page content
         if self._is_already_applied():
             logger.info(f"Already applied for {job_url} (detected on page). Skipping.")
             record_applied_job(job_url)
             return False
-        
+
         # Look for the apply button if not on application form
         if "boards.greenhouse.io" in job_url and "/apply/" not in job_url:
             # We're on a job listing page, not an application form
             apply_buttons = self.driver.find_elements(
-                By.XPATH, 
+                By.XPATH,
                 "//a[contains(text(), 'Apply') or contains(@class, 'apply') or contains(@id, 'apply')]"
             )
-            
+
             if apply_buttons:
                 # Get the href from the apply button
                 apply_url = apply_buttons[0].get_attribute("href")
                 logger.info(f"Found apply URL: {apply_url}")
-                
+
                 if apply_url:
                     self.driver.get(apply_url)
                     self._random_delay((1, 3))
@@ -517,10 +684,10 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                     # Try clicking the button
                     self.driver.execute_script("arguments[0].click();", apply_buttons[0])
                     self._random_delay((1, 3))
-        
+
         # Handle the application form
         success = self._handle_application_form(config)
-        
+
         if success:
             # Record successful application
             record_applied_job(job_url)
@@ -543,4 +710,4 @@ class GreenhouseApplicationBot(BaseJobApplicationBot):
                     logger.info(f"Successfully applied to {job_url}")
                     self._random_delay((10, 30))
             except Exception as e:
-                logger.error(f"Failed to process {job_url}: {e}") 
+                logger.error(f"Failed to process {job_url}: {e}")

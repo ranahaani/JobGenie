@@ -69,6 +69,8 @@ class GreenhouseFormAnalyzer:
         """Extract all form fields from the application form."""
         form = soup.find('form', id='application_form')
         if not form:
+            form = soup.find('form', id='application-form')  # Try alternative ID
+        if not form:
             form = soup.find('form')
         
         if not form:
@@ -80,7 +82,8 @@ class GreenhouseFormAnalyzer:
             "resume_upload": [],
             "cover_letter_upload": [],
             "custom_questions": [],
-            "demographic_questions": []
+            "demographic_questions": [],
+            "education_fields": []
         }
         
         # Extract standard fields (name, email, phone, location)
@@ -101,6 +104,54 @@ class GreenhouseFormAnalyzer:
                     'type': field.get('type', 'text'),
                     'label': label_text,
                     'required': required
+                })
+        
+        # Extract education fields
+        education_container = form.find('div', class_='education--container')
+        if education_container:
+            # Find school fields
+            school_fields = form.find_all('input', id=lambda x: x and x.startswith('school--'))
+            for field in school_fields:
+                field_id = field.get('id')
+                label_elem = form.find('label', attrs={'for': field_id})
+                label_text = label_elem.get_text(strip=True) if label_elem else "School"
+                
+                fields["education_fields"].append({
+                    'id': field_id,
+                    'name': field.get('name', ''),
+                    'type': 'select',  # These are typically React-based selects
+                    'label': label_text,
+                    'required': True if label_elem and '*' in label_elem.get_text() else False
+                })
+            
+            # Find degree fields
+            degree_fields = form.find_all('input', id=lambda x: x and x.startswith('degree--'))
+            for field in degree_fields:
+                field_id = field.get('id')
+                label_elem = form.find('label', attrs={'for': field_id})
+                label_text = label_elem.get_text(strip=True) if label_elem else "Degree"
+                
+                fields["education_fields"].append({
+                    'id': field_id,
+                    'name': field.get('name', ''),
+                    'type': 'select',  # These are typically React-based selects
+                    'label': label_text,
+                    'required': True if label_elem and '*' in label_elem.get_text() else False
+                })
+            
+            # Find discipline fields
+            discipline_fields = form.find_all('input', id=lambda x: x and x.startswith('discipline--'))
+            for field in discipline_fields:
+                field_id = field.get('id')
+                label_elem = form.find('label', attrs={'for': field_id})
+                label_text = label_elem.get_text(strip=True) if label_elem else "Discipline"
+                
+                fields["education_fields"].append({
+                    'id': field_id,
+                    'name': field.get('name', ''),
+                    'type': 'select',  # These are typically React-based selects
+                    'label': label_text,
+                    'required': True if label_elem and '*' in label_elem.get_text() else False
                 })
         
         # Extract file upload fields (resume, cover letter)
